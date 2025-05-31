@@ -42,7 +42,7 @@ def get_signature_key(secret_access_key_string, date_stamp_string, region_name_s
     k_date_bytes = hmac_sha256(k_secret_bytes, date_stamp_string.encode('utf-8'))
     k_region_bytes = hmac_sha256(k_date_bytes, region_name_string.encode('utf-8'))
     k_service_bytes = hmac_sha256(k_region_bytes, service_name_string.encode('utf-8'))
-    k_signing_bytes = hmac_sha256(k_service_bytes, b"aws4_request") # "aws4_request" is a literal string
+    k_signing_bytes = hmac_sha256(k_service_bytes, b"aws4_request")
     return k_signing_bytes
 
 def upload_to_s3(local_file_path, s3_object_name, content_type):
@@ -134,8 +134,6 @@ def upload_to_s3(local_file_path, s3_object_name, content_type):
         "Content-Type": content_type, # Ensure this is sent
         "Content-Length": str(len(data)),
     }
-    # If 'content-type' was included in canonical_headers, it must be here.
-
     # ---- Make the PUT request ----
     url = f"https://{host}{canonical_uri}" # Use HTTPS
     print(f"Uploading to: {url}")
@@ -144,14 +142,11 @@ def upload_to_s3(local_file_path, s3_object_name, content_type):
     try:
         response = urequests.put(url, headers=headers, data=data)
         print(f"Response Status: {response.status_code}")
-        print(f"Response Text: {response.text}") # S3 often gives XML error details
+        print(f"Response Text: {response.text}")
         response.close()
         return response.status_code == 200
     except Exception as e:
         print(f"Error during S3 PUT request: {e}")
-        # You might want to try to get more details from 'e' if possible
-        # import sys
-        # sys.print_exception(e)
         return False
 
 def sync_time():
