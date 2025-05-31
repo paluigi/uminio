@@ -29,10 +29,10 @@
     Open `uboto3.py` and **configure the following constants** at the top of the file with your AWS details:
     ```python
     # --- AWS Configuration ---
-    AWS_ACCESS_KEY = "YOUR_AWS_ACCESS_KEY_ID"  #
-    AWS_SECRET_KEY = "YOUR_AWS_SECRET_ACCESS_KEY" #
-    AWS_REGION = "your-s3-bucket-region"  # e.g., "us-east-1"
-    S3_BUCKET = "your-s3-bucket-name" #
+    AWS_ACCESS_KEY = "YOUR_AWS_ACCESS_KEY_ID"  
+    AWS_SECRET_KEY = "YOUR_AWS_SECRET_ACCESS_KEY"
+    AWS_REGION = "your-s3-bucket-region" 
+    S3_BUCKET = "your-s3-bucket-name" 
     ```
     **Important Security Note:** Hardcoding credentials directly into the script is generally not recommended for production environments. Consider alternative methods for managing secrets on your device if security is a major concern.
 
