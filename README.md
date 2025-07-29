@@ -1,13 +1,15 @@
-# uboto3
+# uminio
 
-`uboto3` is a MicroPython library designed to facilitate uploading files directly from a MicroPython-enabled device (like an ESP32 or ESP8266) to Amazon Web Services (AWS) S3. It implements the necessary AWS Signature Version 4 for an S3 PUT Object request. This allows you to store data, sensor readings, images, or any other files from your microcontroller projects in the cloud.
+`uminio` is a MicroPython library designed to facilitate uploading files directly from a MicroPython-enabled device (like an ESP32 or ESP8266) to MinIO object storage. It implements the necessary AWS Signature Version 4 for an S3 PUT Object request. This allows you to store data, sensor readings, images, or any other files from your microcontroller projects in the cloud.
+
+Forked from `uboto3` [https://github.com/DanielMilstein/uboto3](https://github.com/DanielMilstein/uboto3) 
 
 ## Features
 
-* **Direct S3 Upload:** Upload files directly to an S3 bucket without needing an intermediary server.
+* **Direct S3 Upload:** Upload files directly to an MinIO bucket without needing an intermediary server.
 * **AWS Signature V4:** Implements the required request signing process.
 * **HMAC-SHA256:** Includes a MicroPython-compatible HMAC-SHA256 implementation for signing.
-* **Time Synchronization:** Includes a helper function to synchronize the device's time using NTP, which is crucial for AWS request signing.
+* **Time Synchronization:** Includes a helper function to synchronize the device's time using NTP, which is crucial for MinIO request signing.
 * **Minimal Dependencies:** Built with standard MicroPython libraries like `urequests`, `uhashlib`, `ubinascii`, `utime`, and `network`.
 
 ## Requirements
@@ -24,47 +26,31 @@
 
 ## Setup
 
-1.  **Copy `uboto3.py`:** Place the `uboto3.py` file into the filesystem of your MicroPython device (e.g., in the `/lib` directory or the root).
-2.  **AWS Credentials & Configuration:**
-    Open `uboto3.py` and **configure the following constants** at the top of the file with your AWS details:
+1.  **Copy `uminio.py`:** Place the `uminio.py` file into the filesystem of your MicroPython device (e.g., in the `/lib` directory or the root).
+2.  **MinIO Credentials & Configuration:**
+    Open `uminio.py` and **configure the following constants** at the top of the file with your MinIO details:
     ```python
-    # --- AWS Configuration ---
-    AWS_ACCESS_KEY = "YOUR_AWS_ACCESS_KEY_ID"  
-    AWS_SECRET_KEY = "YOUR_AWS_SECRET_ACCESS_KEY"
-    AWS_REGION = "your-s3-bucket-region" 
-    S3_BUCKET = "your-s3-bucket-name" 
+    # --- MinIO Configuration ---
+    MINIO_ENDPOINT = "192.168.1.100:9000"  # Your MinIO server IP address and port
+    MINIO_ACCESS_KEY = "YOUR_ACCESS_KEY"      # Your MinIO access key
+    MINIO_SECRET_KEY = "YOUR_SECRET_KEY"      # Your MinIO secret key
+    MINIO_BUCKET = "micropython-uploads"  # The bucket you want to upload to
+    MINIO_USE_HTTPS = False               # Set to True if your MinIO server uses HTTPS
     ```
     **Important Security Note:** Hardcoding credentials directly into the script is generally not recommended for production environments. Consider alternative methods for managing secrets on your device if security is a major concern.
 
 3.  **IAM Permissions:**
-    Ensure the AWS IAM user associated with the `AWS_ACCESS_KEY` and `AWS_SECRET_KEY` has the necessary permissions to put objects into the specified S3 bucket. A minimal policy would look like this:
+    Ensure the MinIO user associated with the `MINIO_ACCESS_KEY` and `MINIO_SECRET_KEY` has the necessary permissions to put objects into the specified bucket.
 
-    ```json
-    {
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "s3:PutObject"
-                ],
-                "Resource": [
-                    "arn:aws:s3:::your-s3-bucket-name/*"
-                ]
-            }
-        ]
-    }
-    ```
-    Replace `"your-s3-bucket-name"` with your actual bucket name.
 
 ## Usage Example
 
-Here's how to use `uboto3` to upload a local file from your MicroPython device to S3:
+Here's how to use `uminio` to upload a local file from your MicroPython device to MinIO:
 
 ```python
 import network
 import time
-import uboto3 
+import uminio
 
 # --- Network Configuration (Example for ESP32/ESP8266) ---
 WIFI_SSID = "YOUR_WIFI_SSID"
@@ -85,9 +71,9 @@ def main():
     # 1. Connect to WiFi
     connect_wifi()
 
-    # 2. Synchronize time (critical for AWS authentication)
-    # uboto3.py already has AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION, S3_BUCKET configured
-    uboto3.sync_time() #
+    # 2. Synchronize time (critical for MinIO authentication)
+    # uminio.py already has MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_BUCKET configured
+    uminio.sync_time() #
 
     # 3. Create a dummy file to upload (or use an existing file)
     local_file_to_upload = "data.txt"
@@ -104,8 +90,8 @@ def main():
         return
 
     # 4. Upload the file
-    print(f"Attempting to upload '{local_file_to_upload}' to S3 bucket '{uboto3.S3_BUCKET}' as '{s3_object_name}'...")
-    if uboto3.upload_to_s3(local_file_to_upload, s3_object_name, content_type): #
+    print(f"Attempting to upload '{local_file_to_upload}' to S3 bucket '{uminio.MINIO_BUCKET}' as '{s3_object_name}'...")
+    if uminio.upload_to_s3(local_file_to_upload, s3_object_name, content_type): #
         print("Upload successful!")
     else:
         print("Upload failed.")
