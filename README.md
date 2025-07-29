@@ -91,7 +91,7 @@ def main():
 
     # 4. Upload the file
     print(f"Attempting to upload '{local_file_to_upload}' to S3 bucket '{uminio.MINIO_BUCKET}' as '{s3_object_name}'...")
-    if uminio.upload_to_s3(local_file_to_upload, s3_object_name, content_type): #
+    if uminio.upload_to_minio(local_file_to_upload, s3_object_name, content_type): #
         print("Upload successful!")
     else:
         print("Upload failed.")

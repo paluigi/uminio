@@ -1,21 +1,37 @@
+# uminio.py - A MicroPython library for uploading files to MinIO object storage.
+#
+# Based on the uboto3 library for AWS S3 by DanielMilstein.
+# Modified to support self-hosted MinIO endpoints.
+#
+# GitHub: https://github.com/minio/minio-py (for reference)
+# Original uboto3: https://github.com/DanielMilstein/uboto3
+
 import urequests
 import uhashlib
 import ubinascii
 import utime
-import network
 import ntptime
 
-# --- AWS Configuration ---
-AWS_ACCESS_KEY = "ACCESS_KEY_HERE"
-AWS_SECRET_KEY = "SECRET_KEY_HERE"
-AWS_REGION = "REGION" # e.g., "us-east-1"
-S3_BUCKET = "BUCKET_NAME_HERE"
+# --- MinIO Configuration ---
+# IMPORTANT: Fill in these details for your MinIO server.
+MINIO_ENDPOINT = "192.168.1.100:9000"  # Your MinIO server IP address and port
+MINIO_ACCESS_KEY = "YOUR_ACCESS_KEY"      # Your MinIO access key
+MINIO_SECRET_KEY = "YOUR_SECRET_KEY"      # Your MinIO secret key
+MINIO_BUCKET = "micropython-uploads"  # The bucket you want to upload to
+MINIO_USE_HTTPS = False               # Set to True if your MinIO server uses HTTPS
+
+# MinIO is S3-compatible, but the signing process still requires a region.
+# 'us-east-1' is a safe default that works for most MinIO setups.
+MINIO_REGION = "us-east-1"
 
 
 # --- HMAC-SHA256 Implementation ---
+# This is a core part of the AWS Signature V4 process and remains unchanged.
 def hmac_sha256(key_bytes, msg_bytes):
+    """
+    Calculates the HMAC-SHA256 hash.
+    """
     block_size = 64
-    key_hash_size = 32
 
     if len(key_bytes) > block_size:
         key_bytes = uhashlib.sha256(key_bytes).digest()
@@ -32,20 +48,34 @@ def hmac_sha256(key_bytes, msg_bytes):
     return outer_hash
 
 def get_timestamp():
+    """
+    Generates the required timestamp strings for the signature.
+    """
     now = utime.gmtime()
     amz_date = "{:04d}{:02d}{:02d}T{:02d}{:02d}{:02d}Z".format(now[0], now[1], now[2], now[3], now[4], now[5])
     datestamp = "{:04d}{:02d}{:02d}".format(now[0], now[1], now[2])
     return amz_date, datestamp
 
 def get_signature_key(secret_access_key_string, date_stamp_string, region_name_string, service_name_string):
+    """
+    Derives the signing key from the secret key.
+    """
     k_secret_bytes = ("AWS4" + secret_access_key_string).encode('utf-8')
     k_date_bytes = hmac_sha256(k_secret_bytes, date_stamp_string.encode('utf-8'))
     k_region_bytes = hmac_sha256(k_date_bytes, region_name_string.encode('utf-8'))
-    k_service_bytes = hmac_sha256(k_region_bytes, service_name_string.encode('utf-8'))
+    k_service_bytes = hmac_sha256(k_region_bytes, region_name_string.encode('utf-8'))
     k_signing_bytes = hmac_sha256(k_service_bytes, b"aws4_request")
     return k_signing_bytes
 
-def upload_to_s3(local_file_path, s3_object_name, content_type):
+def upload_to_minio(local_file_path, object_name, content_type="application/octet-stream"):
+    """
+    Uploads a file to a MinIO bucket using AWS Signature V4.
+
+    :param local_file_path: The path to the local file to upload.
+    :param object_name: The name of the object as it will be stored in MinIO.
+    :param content_type: The MIME type of the file.
+    :return: True if upload was successful (HTTP 200), False otherwise.
+    """
     try:
         with open(local_file_path, 'rb') as f:
             data = f.read()
@@ -57,25 +87,25 @@ def upload_to_s3(local_file_path, s3_object_name, content_type):
         print(f"An unexpected error occurred reading file '{local_file_path}': {e}")
         return False
 
-    host = f"{S3_BUCKET}.s3.{AWS_REGION}.amazonaws.com"
+    # The 'host' for MinIO is just the endpoint.
+    host = MINIO_ENDPOINT
     amz_date, datestamp = get_timestamp()
+    service = "s3"
 
     # ---- Task 1: Create Canonical Request ----
+    # For MinIO, the canonical URI must include the bucket name.
     method = "PUT"
-    canonical_uri = f"/{s3_object_name}"
+    canonical_uri = f"/{MINIO_BUCKET}/{object_name}"
     canonical_querystring = ""
     
     payload_hash_bytes = uhashlib.sha256(data).digest()
     payload_hash_hex = ubinascii.hexlify(payload_hash_bytes).decode()
 
-    # Note: Headers must be in alphabetical order by header name (lowercase)
-    # and values should be stripped of leading/trailing whitespace.
+    # Headers must be in alphabetical order by lowercase header name.
     canonical_headers_list = [
         ('host', host),
         ('x-amz-content-sha256', payload_hash_hex),
         ('x-amz-date', amz_date)
-        # If you add Content-Type here, ensure it's also in SignedHeaders and the actual request
-        # ('content-type', content_type) 
     ]
     canonical_headers_list.sort(key=lambda item: item[0])
     
@@ -90,15 +120,14 @@ def upload_to_s3(local_file_path, s3_object_name, content_type):
         f"{method}\n"
         f"{canonical_uri}\n"
         f"{canonical_querystring}\n"
-        f"{canonical_headers_str}\n" # Already has a trailing newline
+        f"{canonical_headers_str}\n"
         f"{signed_headers_str}\n"
         f"{payload_hash_hex}"
     )
-    # print(f"Canonical Request:\n{canonical_request}\n") # For debugging
 
     # ---- Task 2: Create String to Sign ----
     algorithm = "AWS4-HMAC-SHA256"
-    credential_scope = f"{datestamp}/{AWS_REGION}/s3/aws4_request"
+    credential_scope = f"{datestamp}/{MINIO_REGION}/{service}/aws4_request"
     
     hashed_canonical_request_bytes = uhashlib.sha256(canonical_request.encode('utf-8')).digest()
     hashed_canonical_request_hex = ubinascii.hexlify(hashed_canonical_request_bytes).decode()
@@ -109,19 +138,16 @@ def upload_to_s3(local_file_path, s3_object_name, content_type):
         f"{credential_scope}\n"
         f"{hashed_canonical_request_hex}"
     )
-    # print(f"String to Sign:\n{string_to_sign}\n") # For debugging
 
     # ---- Task 3: Calculate Signature ----
-    signing_key_bytes = get_signature_key(AWS_SECRET_KEY, datestamp, AWS_REGION, "s3")
-    
+    signing_key_bytes = get_signature_key(MINIO_SECRET_KEY, datestamp, MINIO_REGION, service)
     signature_bytes = hmac_sha256(signing_key_bytes, string_to_sign.encode('utf-8'))
     signature_hex = ubinascii.hexlify(signature_bytes).decode()
-    # print(f"Signature: {signature_hex}\n") # For debugging
 
     # ---- Task 4: Add Signing Information to the Request ----
     authorization_header = (
         f"{algorithm} "
-        f"Credential={AWS_ACCESS_KEY}/{credential_scope}, "
+        f"Credential={MINIO_ACCESS_KEY}/{credential_scope}, "
         f"SignedHeaders={signed_headers_str}, "
         f"Signature={signature_hex}"
     )
@@ -131,13 +157,14 @@ def upload_to_s3(local_file_path, s3_object_name, content_type):
         "X-Amz-Date": amz_date,
         "X-Amz-Content-Sha256": payload_hash_hex,
         "Authorization": authorization_header,
-        "Content-Type": content_type, # Ensure this is sent
+        "Content-Type": content_type,
         "Content-Length": str(len(data)),
     }
+    
     # ---- Make the PUT request ----
-    url = f"https://{host}{canonical_uri}" # Use HTTPS
+    protocol = "https" if MINIO_USE_HTTPS else "http"
+    url = f"{protocol}://{host}{canonical_uri}"
     print(f"Uploading to: {url}")
-    # print(f"Request Headers: {headers}") # For debugging
 
     try:
         response = urequests.put(url, headers=headers, data=data)
@@ -146,16 +173,20 @@ def upload_to_s3(local_file_path, s3_object_name, content_type):
         response.close()
         return response.status_code == 200
     except Exception as e:
-        print(f"Error during S3 PUT request: {e}")
+        print(f"Error during MinIO PUT request: {e}")
         return False
 
 def sync_time():
+    """
+    Synchronizes the device's real-time clock with an NTP server.
+    This is crucial for generating a valid signature.
+    """
     print("Synchronizing time with NTP server...")
     try:
-        ntptime.settime() # This sets the ESP32's RTC to UTC
+        ntptime.settime() # This sets the device's RTC to UTC
         print("Time synchronized successfully.")
         now_utc = utime.gmtime()
-        print("Current UTC from ESP32: {:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format(
+        print("Current UTC from device: {:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format(
             now_utc[0], now_utc[1], now_utc[2], now_utc[3], now_utc[4], now_utc[5]))
     except Exception as e:
         print(f"Error synchronizing time: {e}")
