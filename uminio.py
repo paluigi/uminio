@@ -3,7 +3,7 @@
 # Based on the uboto3 library for AWS S3 by DanielMilstein.
 # Modified to support self-hosted MinIO endpoints.
 #
-# GitHub: https://github.com/minio/minio-py (for reference)
+# MinIO Python client: https://github.com/minio/minio-py (for reference)
 # Original uboto3: https://github.com/DanielMilstein/uboto3
 
 import urequests
@@ -63,7 +63,7 @@ def get_signature_key(secret_access_key_string, date_stamp_string, region_name_s
     k_secret_bytes = ("AWS4" + secret_access_key_string).encode('utf-8')
     k_date_bytes = hmac_sha256(k_secret_bytes, date_stamp_string.encode('utf-8'))
     k_region_bytes = hmac_sha256(k_date_bytes, region_name_string.encode('utf-8'))
-    k_service_bytes = hmac_sha256(k_region_bytes, region_name_string.encode('utf-8'))
+    k_service_bytes = hmac_sha256(k_region_bytes, service_name_string.encode('utf-8')) 
     k_signing_bytes = hmac_sha256(k_service_bytes, b"aws4_request")
     return k_signing_bytes
 
