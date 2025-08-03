@@ -6,6 +6,7 @@ import network
 import ntptime
 
 # --- AWS Configuration ---
+PROVIDER = "amazonaws.com" # or "backblazeb2.com" or other S3 compatible provider
 AWS_ACCESS_KEY = "ACCESS_KEY_HERE"
 AWS_SECRET_KEY = "SECRET_KEY_HERE"
 AWS_REGION = "REGION" # e.g., "us-east-1"
@@ -57,7 +58,7 @@ def upload_to_s3(local_file_path, s3_object_name, content_type):
         print(f"An unexpected error occurred reading file '{local_file_path}': {e}")
         return False
 
-    host = f"{S3_BUCKET}.s3.{AWS_REGION}.amazonaws.com"
+    host = f"{S3_BUCKET}.s3.{AWS_REGION}.{PROVIDER}"
     amz_date, datestamp = get_timestamp()
 
     # ---- Task 1: Create Canonical Request ----
