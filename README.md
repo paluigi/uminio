@@ -26,16 +26,25 @@ Forked from `uboto3` [https://github.com/DanielMilstein/uboto3](https://github.c
 
 ## Setup
 
-1.  **Copy `uminio.py`:** Place the `uminio.py` file into the filesystem of your MicroPython device (e.g., in the `/lib` directory or the root).
+1.  **Copy `__init__.py`:** Create a `uminio` folder in the `/lib` directory of your MicroPython device and copy the `__init__.py` file into it.
 2.  **MinIO Credentials & Configuration:**
-    Open `uminio.py` and **configure the following constants** at the top of the file with your MinIO details:
+    Import the `MinioClient` class in your MicroPython script and configure it with your MinIO server details. You can do this by setting the following variables in your script:
     ```python
-    # --- MinIO Configuration ---
+    from uminio import MinioClient
+    # --- MinIO Client Configuration ---
     MINIO_ENDPOINT = "192.168.1.100:9000"  # Your MinIO server IP address and port
     MINIO_ACCESS_KEY = "YOUR_ACCESS_KEY"      # Your MinIO access key
     MINIO_SECRET_KEY = "YOUR_SECRET_KEY"      # Your MinIO secret key
-    MINIO_BUCKET = "micropython-uploads"  # The bucket you want to upload to
+    MINIO_REGION = "eu-east-1"                # The region for your MinIO server
     MINIO_USE_HTTPS = False               # Set to True if your MinIO server uses HTTPS
+
+    mc = MinioClient(
+        endpoint=MINIO_ENDPOINT,
+        access_key=MINIO_ACCESS_KEY,
+        secret_key=MINIO_SECRET_KEY,
+        region=MINIO_REGION,
+        use_https=MINIO_USE_HTTPS,
+    )
     ```
     **Important Security Note:** Hardcoding credentials directly into the script is generally not recommended for production environments. Consider alternative methods for managing secrets on your device if security is a major concern.
 
@@ -50,8 +59,21 @@ Here's how to use `uminio` to upload a local file from your MicroPython device t
 ```python
 import network
 import time
-import uminio
+from uminio import MinioClient
+# --- MinIO Client Configuration ---
+MINIO_ENDPOINT = "192.168.1.100:9000"  # Your MinIO server IP address and port
+MINIO_ACCESS_KEY = "YOUR_ACCESS_KEY"      # Your MinIO access key
+MINIO_SECRET_KEY = "YOUR_SECRET_KEY"      # Your MinIO secret key
+MINIO_REGION = "eu-east-1"                # The region for your MinIO server
+MINIO_USE_HTTPS = False               # Set to True if your MinIO server uses HTTPS
 
+mc = MinioClient(
+    endpoint=MINIO_ENDPOINT,
+    access_key=MINIO_ACCESS_KEY,
+    secret_key=MINIO_SECRET_KEY,
+    region=MINIO_REGION,
+    use_https=MINIO_USE_HTTPS,
+)
 # --- Network Configuration (Example for ESP32/ESP8266) ---
 WIFI_SSID = "YOUR_WIFI_SSID"
 WIFI_PASSWORD = "YOUR_WIFI_PASSWORD"
@@ -72,11 +94,11 @@ def main():
     connect_wifi()
 
     # 2. Synchronize time (critical for MinIO authentication)
-    # uminio.py already has MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_BUCKET configured
-    uminio.sync_time() #
+    mc.sync_time() #
 
     # 3. Create a dummy file to upload (or use an existing file)
     local_file_to_upload = "data.txt"
+    bucket_name = "my_bucket" # Ensure this bucket exists in MinIO
     s3_object_name = "my_device_data/data.txt" # Desired path and name in S3
     content_type = "text/plain" #
 
@@ -90,8 +112,8 @@ def main():
         return
 
     # 4. Upload the file
-    print(f"Attempting to upload '{local_file_to_upload}' to S3 bucket '{uminio.MINIO_BUCKET}' as '{s3_object_name}'...")
-    if uminio.upload_to_minio(local_file_to_upload, s3_object_name, content_type): #
+    print(f"Attempting to upload '{local_file_to_upload}' to MinIO bucket '{bucket_name}' as '{s3_object_name}'...")
+    if mc.upload_file(local_file_to_upload, bucket_name, s3_object_name, content_type): #
         print("Upload successful!")
     else:
         print("Upload failed.")
