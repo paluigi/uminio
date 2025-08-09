@@ -12,18 +12,6 @@ import ubinascii
 import utime
 import ntptime
 
-# --- MinIO Configuration ---
-# IMPORTANT: Fill in these details for your MinIO server.
-MINIO_ENDPOINT = "192.168.1.100:9000"  # Your MinIO server IP address and port
-MINIO_ACCESS_KEY = "YOUR_ACCESS_KEY"  # Your MinIO access key
-MINIO_SECRET_KEY = "YOUR_SECRET_KEY"  # Your MinIO secret key
-MINIO_BUCKET = "micropython-uploads"  # The bucket you want to upload to
-MINIO_USE_HTTPS = False  # Set to True if your MinIO server uses HTTPS
-
-# MinIO is S3-compatible, but the signing process still requires a region.
-# 'us-east-1' is a safe default that works for most MinIO setups.
-MINIO_REGION = "us-east-1"
-
 
 class MinioClient:
     """A client for interacting with MinIO object storage.
